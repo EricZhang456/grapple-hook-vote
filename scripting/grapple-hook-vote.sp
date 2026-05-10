@@ -2,7 +2,7 @@
 #include <tf2>
 #include <nativevotes>
 
-bool g_bServerWaitingForPlayers, g_bNativeVotesLoaded = false;
+bool g_bServerWaitingForPlayers = false, g_bNativeVotesLoaded = false;
 
 int g_iLastGrapplingHookVoteTime;
 
@@ -18,6 +18,9 @@ public Plugin myinfo = {
 }
 
 public void OnPluginStart() {
+    LoadTranslations("common.phrases");
+    LoadTranslations("grapple-hook-vote.phrases");
+
     g_cvGrapplingHookEnabled = FindConVar("tf_grapplinghook_enable");
     g_cvServerArena = FindConVar("tf_gamemode_arena");
     g_cvSpecVote = FindConVar("sv_vote_allow_spectators");
@@ -56,14 +59,13 @@ public void TF2_OnWaitingForPlayersEnd() {
     }
 }
 
-void StartVote(int client, const char[] toggleType) {
+void StartVote(int client, bool turnOn) {
     if (!g_bNativeVotesLoaded) {
-        PrintToChat(client, "Server has not yet loaded the required library.");
         return;
     }
 
     if (NativeVotes_IsVoteInProgress()) {
-        PrintToChat(client, "A vote is already in progress.");
+        PrintToChat(client, "%t", "Vote in Progress");
         return;
     }
 
@@ -80,7 +82,7 @@ void StartVote(int client, const char[] toggleType) {
     int voteCooldownTimePassed = GetTime() - g_iLastGrapplingHookVoteTime;
     if (NativeVotes_CheckVoteDelay() != 0 || voteCooldownTimePassed < g_cvGrapplingHookVoteCooldown.IntValue) {
         int voteCooldownTimeLeft = g_cvGrapplingHookVoteCooldown.IntValue - voteCooldownTimePassed;
-        if (voteCooldownTimeLeft > voteCooldownTimeLeft || voteCooldownTimeLeft < 0) {
+        if (voteCooldownTimeLeft < 0) {
             voteCooldownTimeLeft = 0;
         }
         NativeVotes_DisplayCallVoteFail(client, NativeVotesCallFail_Recent,
@@ -88,9 +90,9 @@ void StartVote(int client, const char[] toggleType) {
         return;
     }
 
-    NativeVote vote = new NativeVote(HandleHookVote, NativeVotesType_Custom_Mult);
+    NativeVote vote = new NativeVote(HandleHookVote, NativeVotesType_Custom_Mult, NATIVEVOTES_ACTIONS_DEFAULT | MenuAction_Display | MenuAction_DisplayItem);
     vote.Initiator = client;
-    vote.SetDetails("Turn %s grappling hook?", toggleType);
+    vote.SetDetails(turnOn ? "GRAPPLE_HOOK_VOTE_ON_TITLE" : "GRAPPLE_HOOK_VOTE_OFF_TITLE");
     vote.AddItem("yes", "Yes");
     vote.AddItem("no", "No");
     vote.DisplayVoteToAll(g_cvVoteDuration.IntValue);
@@ -119,6 +121,20 @@ public int HandleHookVote(NativeVote vote, MenuAction action, int client, int it
         case MenuAction_End: {
             vote.Close();
         }
+        case MenuAction_Display: {
+            char title[64], targetStr[64];
+            vote.GetTitle(title, sizeof(title));
+            Format(targetStr, sizeof(targetStr), "%T", title, client);
+            return view_as<int>(NativeVotes_RedrawVoteTitle(targetStr));
+        }
+        case MenuAction_DisplayItem: {
+            char sourceInfoStr[64], sourceDispStr[64], targetStr[64];
+            vote.GetItem(items, sourceInfoStr, sizeof(sourceInfoStr), sourceDispStr, sizeof(sourceDispStr));
+            if (StrEqual(sourceInfoStr, "yes") || StrEqual(sourceInfoStr, "no")) {
+                Format(targetStr, sizeof(targetStr), "%T", sourceDispStr, client);
+                return view_as<int>(NativeVotes_RedrawVoteItem(targetStr));
+            }
+        }
         case MenuAction_VoteCancel: {
             if (client == VoteCancel_NoVotes) {
                 vote.DisplayFail(NativeVotesFail_NotEnoughVotes);
@@ -131,7 +147,7 @@ public int HandleHookVote(NativeVote vote, MenuAction action, int client, int it
                 vote.DisplayFail(NativeVotesFail_Loses);
             } else {
                 if (CountVote(vote, client, items)) {
-                    vote.DisplayPassCustom("Turning %s grappling hook...", g_cvGrapplingHookEnabled.BoolValue ? "off" : "on" );
+                    vote.DisplayPassCustom("%t", g_cvGrapplingHookEnabled.BoolValue ? "GRAPPLE_HOOK_VOTE_TURNING_OFF" : "GRAPPLE_HOOK_VOTE_TURNING_ON" );
                     g_cvGrapplingHookEnabled.BoolValue = !g_cvGrapplingHookEnabled.BoolValue;
                 } else {
                     vote.DisplayFail(NativeVotesFail_Loses);
@@ -144,9 +160,9 @@ public int HandleHookVote(NativeVote vote, MenuAction action, int client, int it
 
 public Action Cmd_HandleVoteHook(int client, int args) {
     if (g_cvGrapplingHookVoteAllowed.BoolValue && client != 0) {
-        StartVote(client, g_cvGrapplingHookEnabled.BoolValue ? "off" : "on" );
+        StartVote(client, !g_cvGrapplingHookEnabled.BoolValue);
     } else {
-        PrintToChat(client, "Grappling hook vote is not allowed.")
+        PrintToChat(client, "%t", "GRAPPLE_HOOK_VOTE_NOT_ALLOWED")
     }
     return Plugin_Handled;
 }

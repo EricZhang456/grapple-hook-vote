@@ -1,0 +1,23 @@
+"Phrases"
+{
+    "GRAPPLE_HOOK_VOTE_NOT_ALLOWED"
+    {
+        "en"    "Grappling hook vote is not allowed."
+    }
+    "GRAPPLE_HOOK_VOTE_ON_TITLE"
+    {
+        "en"    "Turn on grappling hook?"
+    }
+    "GRAPPLE_HOOK_VOTE_OFF_TITLE"
+    {
+        "en"    "Turn off grappling hook?"
+    }
+    "GRAPPLE_HOOK_VOTE_TURNING_ON"
+    {
+        "en"    "Turning on grappling hook..."
+    }
+    "GRAPPLE_HOOK_VOTE_TURNING_OFF"
+    {
+        "en"    "Turning off grappling hook..."
+    }
+}
